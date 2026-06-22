@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "project_myrmidon",
+  "version": "${version}",
+  "name": "Project Myrmidon",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/project_myrmidon/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-datagen": [
+      "org.pmca.project_myrmidon.client.Project_myrmidonDataGenerator"
+    ],
+    "client": [
+      "org.pmca.project_myrmidon.client.Project_myrmidonClient"
+    ],
+    "main": [
+      "org.pmca.project_myrmidon.Project_myrmidon"
+    ]
+  },
+  "mixins": [
+    "project_myrmidon.mixins.json",
+    {
+      "config": "project_myrmidon.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
