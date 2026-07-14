@@ -2,6 +2,7 @@ package org.pmca.project_myrmidon.client.command;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -29,8 +30,9 @@ public class BotCommandRegistry {
         });
     }
 
-    private static int executeCreate(FabricClientCommandSource source) {
-        String name = StringArgumentType.getString(source, "name");
+    private static int executeCreate(CommandContext<FabricClientCommandSource> context) {
+        FabricClientCommandSource source = context.getSource();
+        String name = StringArgumentType.getString(context, "name");
         BotManager manager = BotManager.getInstance();
 
         if (manager.getBot(name) != null) {
@@ -52,8 +54,9 @@ public class BotCommandRegistry {
         }
     }
 
-    private static int executeRemove(FabricClientCommandSource source) {
-        String name = StringArgumentType.getString(source, "name");
+    private static int executeRemove(CommandContext<FabricClientCommandSource> context) {
+        FabricClientCommandSource source = context.getSource();
+        String name = StringArgumentType.getString(context, "name");
         BotManager manager = BotManager.getInstance();
 
         if (manager.removeBot(name)) {
@@ -65,7 +68,8 @@ public class BotCommandRegistry {
         }
     }
 
-    private static int executeList(FabricClientCommandSource source) {
+    private static int executeList(CommandContext<FabricClientCommandSource> context) {
+        FabricClientCommandSource source = context.getSource();
         Collection<BotProcess> bots = BotManager.getInstance().listBots();
 
         if (bots.isEmpty()) {
