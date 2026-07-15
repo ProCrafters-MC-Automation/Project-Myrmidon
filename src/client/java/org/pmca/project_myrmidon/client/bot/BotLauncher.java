@@ -8,8 +8,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.jar.JarFile;
+import java.util.zip.ZipEntry;
 
 public class BotLauncher {
 
@@ -30,6 +34,7 @@ public class BotLauncher {
         Path botModsDir = botRunDir.resolve("mods");
 
         Files.createDirectories(botModsDir);
+        copyClasspathMods(botModsDir);
         copyMods(config, botModsDir);
         writeBotConfig(config, botRunDir);
 
@@ -59,6 +64,42 @@ public class BotLauncher {
         }
     }
 
+    private void copyClasspathMods(Path botModsDir) throws IOException {
+        String classpath = System.getProperty("java.class.path");
+        if (classpath == null || classpath.isEmpty()) {
+            return;
+        }
+
+        Set<String> copied = new HashSet<>();
+        String separator = System.getProperty("path.separator");
+        for (String entry : classpath.split(separator)) {
+            Path path = Path.of(entry);
+            if (!Files.isRegularFile(path) || !path.toString().endsWith(".jar")) {
+                continue;
+            }
+            if (!isFabricMod(path)) {
+                continue;
+            }
+            String fileName = path.getFileName().toString();
+            if (copied.contains(fileName)) {
+                continue;
+            }
+            Path target = botModsDir.resolve(fileName);
+            Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
+            copied.add(fileName);
+            System.out.println("[BotLauncher] Copied classpath mod: " + fileName);
+        }
+    }
+
+    private static boolean isFabricMod(Path jarPath) {
+        try (JarFile jar = new JarFile(jarPath.toFile())) {
+            ZipEntry entry = jar.getEntry("fabric.mod.json");
+            return entry != null;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     private void writeBotConfig(BotConfig config, Path botRunDir) throws IOException {
         Map<String, Object> data = Map.of(
                 "name", config.getName(),
@@ -77,6 +118,11 @@ public class BotLauncher {
 
         cmd.add("-Dproject_myrmidon.bot=true");
         cmd.add("-Dproject_myrmidon.bot_name=" + config.getName());
+
+        String namespace = detectNamespace();
+        if (namespace != null) {
+            cmd.add("-Dfabric.runtimeMappingNamespace=" + namespace);
+        }
 
         for (String jvmArg : config.getJvmArgs()) {
             cmd.add(jvmArg);
@@ -103,5 +149,14 @@ public class BotLauncher {
         cmd.add(botRunDir.toAbsolutePath().toString());
 
         return cmd;
+    }
+
+    private static String detectNamespace() {
+        try {
+            return net.fabricmc.loader.api.FabricLoader.getInstance()
+                    .getMappingResolver().getCurrentRuntimeNamespace();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
