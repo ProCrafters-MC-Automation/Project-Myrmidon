@@ -11,6 +11,10 @@ import org.pmca.project_myrmidon.client.bot.BotConfig;
 import org.pmca.project_myrmidon.client.bot.BotManager;
 import org.pmca.project_myrmidon.client.bot.BotProcess;
 
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ServerAddress;
+import net.minecraft.client.network.ServerInfo;
+
 import java.io.IOException;
 import java.util.Collection;
 
@@ -40,8 +44,19 @@ public class BotCommandRegistry {
             return 0;
         }
 
+        MinecraftClient mc = MinecraftClient.getInstance();
+        ServerInfo serverInfo = mc.getCurrentServerEntry();
+        if (serverInfo == null) {
+            source.sendError(Text.literal("You must be connected to a server to create a bot"));
+            return 0;
+        }
+
+        ServerAddress serverAddress = ServerAddress.parse(serverInfo.address);
+
         BotConfig config = BotConfig.builder()
                 .name(name)
+                .serverAddress(serverAddress.getAddress())
+                .serverPort(serverAddress.getPort())
                 .build();
 
         try {
