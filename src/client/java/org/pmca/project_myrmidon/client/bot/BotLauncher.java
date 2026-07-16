@@ -13,6 +13,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 
 public class BotLauncher {
@@ -72,6 +75,7 @@ public class BotLauncher {
 
         Set<String> copied = new HashSet<>();
         String separator = System.getProperty("path.separator");
+
         for (String entry : classpath.split(separator)) {
             Path path = Path.of(entry);
             if (!Files.isRegularFile(path) || !path.toString().endsWith(".jar")) {
@@ -88,6 +92,99 @@ public class BotLauncher {
             Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
             copied.add(fileName);
             System.out.println("[BotLauncher] Copied classpath mod: " + fileName);
+        }
+
+        List<Path> directories = new ArrayList<>();
+        for (String entry : classpath.split(separator)) {
+            Path path = Path.of(entry);
+            if (Files.isDirectory(path)) {
+                directories.add(path);
+            }
+        }
+
+        for (Path dir : directories) {
+            if (!Files.isRegularFile(dir.resolve("fabric.mod.json"))) {
+                continue;
+            }
+            String modId = readModId(dir);
+            if (modId == null || copied.contains(modId + ".jar")) {
+                continue;
+            }
+            List<Path> members = findProjectClasspathDirs(dir, directories);
+            String jarName = modId + "-dev-mod.jar";
+            Path target = botModsDir.resolve(jarName);
+            packageDirectoriesIntoJar(members, target);
+            copied.add(jarName);
+            System.out.println("[BotLauncher] Packaged directory mod '" + modId + "' into: " + jarName);
+        }
+    }
+
+    private List<Path> findProjectClasspathDirs(Path modRoot, List<Path> allDirs) {
+        Path projectRoot = findProjectRoot(modRoot);
+        if (projectRoot == null) {
+            return List.of(modRoot);
+        }
+        Path buildDir = projectRoot.resolve("build");
+        List<Path> result = new ArrayList<>();
+        for (Path dir : allDirs) {
+            if (dir.startsWith(buildDir)) {
+                result.add(dir);
+            }
+        }
+        return result.isEmpty() ? List.of(modRoot) : result;
+    }
+
+    private static Path findProjectRoot(Path start) {
+        Path current = start;
+        while (current != null) {
+            if (Files.isDirectory(current.resolve("build")) && Files.isDirectory(current.resolve("src"))) {
+                return current;
+            }
+            current = current.getParent();
+        }
+        return null;
+    }
+
+    private static String readModId(Path dir) {
+        try {
+            Path fabricModJson = dir.resolve("fabric.mod.json");
+            if (!Files.isRegularFile(fabricModJson)) {
+                return null;
+            }
+            String content = Files.readString(fabricModJson);
+            Matcher match = Pattern.compile("\"id\"\\s*:\\s*\"([^\"]+)\"").matcher(content);
+            return match.find() ? match.group(1) : null;
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private static void packageDirectoriesIntoJar(List<Path> directories, Path jarPath) throws IOException {
+        try (JarOutputStream jos = new JarOutputStream(Files.newOutputStream(jarPath))) {
+            Set<String> added = new HashSet<>();
+            for (Path dir : directories) {
+                if (!Files.isDirectory(dir)) {
+                    continue;
+                }
+                packageDirectory(dir, dir, jos, added);
+            }
+        }
+    }
+
+    private static void packageDirectory(Path root, Path current, JarOutputStream jos, Set<String> added) throws IOException {
+        if (Files.isDirectory(current)) {
+            try (var stream = Files.list(current)) {
+                for (Path child : stream.toList()) {
+                    packageDirectory(root, child, jos, added);
+                }
+            }
+        } else {
+            String entryName = root.relativize(current).toString().replace('\\', '/');
+            if (added.add(entryName)) {
+                jos.putNextEntry(new ZipEntry(entryName));
+                Files.copy(current, jos);
+                jos.closeEntry();
+            }
         }
     }
 
