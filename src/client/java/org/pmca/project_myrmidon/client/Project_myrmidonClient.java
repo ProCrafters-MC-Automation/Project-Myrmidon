@@ -21,6 +21,7 @@ public class Project_myrmidonClient implements ClientModInitializer {
 
     private static final Gson GSON = new Gson();
     private static final String BOT_CONFIG_FILE = "bot-config.json";
+    private static boolean connectAttempted = false;
 
     @Override
     public void onInitializeClient() {
@@ -39,15 +40,21 @@ public class Project_myrmidonClient implements ClientModInitializer {
 
     private void registerBotAutoConnect() {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (connectAttempted) {
+                return;
+            }
             if (client.currentScreen instanceof TitleScreen) {
+                connectAttempted = true;
                 connectToServer(client);
+            } else if (client.currentScreen != null) {
+                client.setScreen(null);
             }
         });
     }
 
     private void connectToServer(MinecraftClient client) {
-        Path gameDir = client.runDirectory;
-        Path configPath = gameDir.toPath().resolve(BOT_CONFIG_FILE);
+        Path gameDir = client.runDirectory.toPath();
+        Path configPath = gameDir.resolve(BOT_CONFIG_FILE);
 
         if (!Files.exists(configPath)) {
             System.out.println("[Project Myrmidon] bot-config.json not found at " + configPath);
