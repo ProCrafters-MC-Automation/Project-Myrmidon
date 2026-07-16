@@ -65,6 +65,17 @@ public class BotLauncher {
             Files.copy(modPath, target, StandardCopyOption.REPLACE_EXISTING);
             System.out.println("[BotLauncher] Copied mod: " + fileName);
         }
+
+        try (var stream = Files.list(sourceModsDir)) {
+            for (Path modFile : stream.toList()) {
+                if (Files.isRegularFile(modFile) && modFile.toString().endsWith(".jar")) {
+                    Path fileName = modFile.getFileName();
+                    Path target = botModsDir.resolve(fileName);
+                    Files.copy(modFile, target, StandardCopyOption.REPLACE_EXISTING);
+                    System.out.println("[BotLauncher] Copied bot-mod: " + fileName);
+                }
+            }
+        }
     }
 
     private void copyClasspathMods(Path botModsDir) throws IOException {

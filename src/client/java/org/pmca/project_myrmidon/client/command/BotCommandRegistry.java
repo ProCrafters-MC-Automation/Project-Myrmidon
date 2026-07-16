@@ -1,5 +1,7 @@
 package org.pmca.project_myrmidon.client.command;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -16,9 +18,14 @@ import net.minecraft.client.network.ServerAddress;
 import net.minecraft.client.network.ServerInfo;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Map;
 
 public class BotCommandRegistry {
+
+    private static final Gson GSON = new GsonBuilder().create();
 
     public static void register() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
@@ -30,7 +37,15 @@ public class BotCommandRegistry {
                             .then(ClientCommandManager.argument("name", StringArgumentType.word())
                                     .executes(BotCommandRegistry::executeRemove)))
                     .then(ClientCommandManager.literal("list")
-                            .executes(BotCommandRegistry::executeList)));
+                            .executes(BotCommandRegistry::executeList))
+                    .then(ClientCommandManager.literal("say")
+                            .then(ClientCommandManager.argument("name", StringArgumentType.word())
+                                    .then(ClientCommandManager.argument("message", StringArgumentType.greedyString())
+                                            .executes(BotCommandRegistry::executeSay))))
+                    .then(ClientCommandManager.literal("cmd")
+                            .then(ClientCommandManager.argument("name", StringArgumentType.word())
+                                    .then(ClientCommandManager.argument("command", StringArgumentType.greedyString())
+                                            .executes(BotCommandRegistry::executeCmd)))));
         });
     }
 
@@ -99,5 +114,45 @@ public class BotCommandRegistry {
         }
         source.sendFeedback(Text.literal(sb.toString()));
         return Command.SINGLE_SUCCESS;
+    }
+
+    private static int executeSay(CommandContext<FabricClientCommandSource> context) {
+        FabricClientCommandSource source = context.getSource();
+        String name = StringArgumentType.getString(context, "name");
+        String message = StringArgumentType.getString(context, "message");
+
+        if (BotManager.getInstance().getBot(name) == null) {
+            source.sendError(Text.literal("Bot '" + name + "' not found"));
+            return 0;
+        }
+
+        writeCommandFile(name, "chat", message);
+        source.sendFeedback(Text.literal("Bot '" + name + "' will say: " + message));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int executeCmd(CommandContext<FabricClientCommandSource> context) {
+        FabricClientCommandSource source = context.getSource();
+        String name = StringArgumentType.getString(context, "name");
+        String command = StringArgumentType.getString(context, "command");
+
+        if (BotManager.getInstance().getBot(name) == null) {
+            source.sendError(Text.literal("Bot '" + name + "' not found"));
+            return 0;
+        }
+
+        writeCommandFile(name, "command", command);
+        source.sendFeedback(Text.literal("Bot '" + name + "' will run: " + command));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static void writeCommandFile(String botName, String type, String content) {
+        Path commandFile = Path.of("run/bots", botName, "pending_command.json");
+        try {
+            Map<String, String> data = Map.of("type", type, "content", content);
+            Files.writeString(commandFile, GSON.toJson(data));
+        } catch (IOException e) {
+            System.err.println("[BotCommandRegistry] Failed to write command file: " + e.getMessage());
+        }
     }
 }

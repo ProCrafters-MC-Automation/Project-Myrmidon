@@ -40,16 +40,47 @@ public class Project_myrmidonClient implements ClientModInitializer {
 
     private void registerBotAutoConnect() {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (connectAttempted) {
-                return;
+            if (!connectAttempted) {
+                if (client.currentScreen instanceof TitleScreen) {
+                    connectAttempted = true;
+                    connectToServer(client);
+                } else if (client.currentScreen != null) {
+                    client.setScreen(null);
+                }
             }
-            if (client.currentScreen instanceof TitleScreen) {
-                connectAttempted = true;
-                connectToServer(client);
-            } else if (client.currentScreen != null) {
-                client.setScreen(null);
+
+            if (client.player != null) {
+                executePendingCommand(client);
             }
         });
+    }
+
+    private void executePendingCommand(MinecraftClient client) {
+        Path commandFile = client.runDirectory.toPath().resolve("pending_command.json");
+        if (!Files.exists(commandFile)) {
+            return;
+        }
+
+        try {
+            String json = Files.readString(commandFile);
+            JsonObject obj = GSON.fromJson(json, JsonObject.class);
+            String type = obj.get("type").getAsString();
+            String content = obj.get("content").getAsString();
+
+            if ("chat".equals(type)) {
+                client.getNetworkHandler().sendChatMessage(content);
+                System.out.println("[Project Myrmidon] Sent chat: " + content);
+            } else if ("command".equals(type)) {
+                String cmd = content.startsWith("/") ? content.substring(1) : content;
+                client.getNetworkHandler().sendChatCommand(cmd);
+                System.out.println("[Project Myrmidon] Ran command: " + content);
+            }
+
+            Files.delete(commandFile);
+        } catch (Exception e) {
+            System.err.println("[Project Myrmidon] Failed to execute command: " + e.getMessage());
+            try { Files.deleteIfExists(commandFile); } catch (Exception ignored) {}
+        }
     }
 
     private void connectToServer(MinecraftClient client) {
