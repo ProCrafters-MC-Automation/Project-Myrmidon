@@ -147,8 +147,10 @@ public class BotCommandRegistry {
     }
 
     private static void writeCommandFile(String botName, String type, String content) {
-        Path commandFile = Path.of("run/bots", botName, "pending_command.json");
+        Path hostGameDir = MinecraftClient.getInstance().runDirectory.toPath();
+        Path commandFile = hostGameDir.resolve("bots").resolve(botName).resolve("pending_command.json");
         try {
+            Files.createDirectories(commandFile.getParent());
             Map<String, String> data = Map.of("type", type, "content", content);
             Files.writeString(commandFile, GSON.toJson(data));
         } catch (IOException e) {
