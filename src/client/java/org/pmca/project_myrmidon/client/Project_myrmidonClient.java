@@ -1,17 +1,33 @@
 package org.pmca.project_myrmidon.client;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.TitleScreen;
+import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
+import net.minecraft.client.network.ServerAddress;
+import net.minecraft.client.network.ServerInfo;
 import org.pmca.project_myrmidon.client.bot.BotManager;
 import org.pmca.project_myrmidon.client.command.BotCommandRegistry;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class Project_myrmidonClient implements ClientModInitializer {
 
+    private static final Gson GSON = new Gson();
+    private static final String BOT_CONFIG_FILE = "bot-config.json";
+
     @Override
     public void onInitializeClient() {
         if (isBotMode()) {
-            System.out.println("[Project Myrmidon] Bot mode detected, skipping client command registration");
+            String botName = System.getProperty("project_myrmidon.bot_name", "unknown");
+            System.out.println("[Project Myrmidon] Bot mode detected: " + botName);
+            registerBotAutoConnect();
             return;
         }
 
@@ -19,6 +35,41 @@ public class Project_myrmidonClient implements ClientModInitializer {
         BotManager.init(projectRoot);
         BotCommandRegistry.register();
         System.out.println("[Project Myrmidon] Bot system initialized");
+    }
+
+    private void registerBotAutoConnect() {
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (client.currentScreen instanceof TitleScreen) {
+                connectToServer(client);
+            }
+        });
+    }
+
+    private void connectToServer(MinecraftClient client) {
+        Path gameDir = client.runDirectory;
+        Path configPath = gameDir.toPath().resolve(BOT_CONFIG_FILE);
+
+        if (!Files.exists(configPath)) {
+            System.out.println("[Project Myrmidon] bot-config.json not found at " + configPath);
+            return;
+        }
+
+        try (Reader reader = Files.newBufferedReader(configPath)) {
+            JsonObject json = GSON.fromJson(reader, JsonObject.class);
+            String serverAddress = json.get("serverAddress").getAsString();
+            int serverPort = json.get("serverPort").getAsInt();
+            String botName = json.get("name").getAsString();
+
+            String address = serverPort == 25565 ? serverAddress : serverAddress + ":" + serverPort;
+
+            ServerInfo serverInfo = new ServerInfo(botName, address, ServerInfo.ServerType.OTHER);
+            ServerAddress parsed = ServerAddress.parse(address);
+
+            System.out.println("[Project Myrmidon] Bot '" + botName + "' connecting to " + address);
+            ConnectScreen.connect(null, client, parsed, serverInfo, false, null);
+        } catch (IOException e) {
+            System.out.println("[Project Myrmidon] Failed to read bot-config.json: " + e.getMessage());
+        }
     }
 
     private boolean isBotMode() {
@@ -30,8 +81,6 @@ public class Project_myrmidonClient implements ClientModInitializer {
         if (classpath != null && !classpath.isEmpty()) {
             String firstEntry = classpath.split(java.io.File.pathSeparator)[0];
             Path path = Path.of(firstEntry);
-            // Walk up from the classpath entry to find the project root
-            // In dev, classpath entries are under build/classes/java/client or similar
             Path current = path;
             while (current != null) {
                 if (current.resolve("build.gradle").toFile().exists()
@@ -41,7 +90,6 @@ public class Project_myrmidonClient implements ClientModInitializer {
                 current = current.getParent();
             }
         }
-        // Fallback: assume we're running from the project root
         return Path.of("").toAbsolutePath();
     }
 }
