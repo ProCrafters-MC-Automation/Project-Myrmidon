@@ -137,14 +137,6 @@ public class BotLauncher {
         cmd.add("--username");
         cmd.add(config.getName());
 
-        cmd.add("--server");
-        cmd.add(config.getServerAddress());
-
-        cmd.add("--port");
-        cmd.add(String.valueOf(config.getServerPort()));
-
-        cmd.add("--nogui");
-
         cmd.add("--gameDir");
         cmd.add(botRunDir.toAbsolutePath().toString());
 
