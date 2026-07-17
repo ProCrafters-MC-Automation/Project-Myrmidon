@@ -28,7 +28,6 @@ fabricApi {
 }
 
 repositories {
-    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
@@ -39,7 +38,7 @@ dependencies {
 
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-    modImplementation 'com.github.cabaletta:baritone:v1.15.0'
+    modImplementation fileTree(dir: 'libs', include: '*.jar')
 }
 
 processResources {
