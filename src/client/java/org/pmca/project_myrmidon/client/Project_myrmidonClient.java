@@ -71,15 +71,41 @@ public class Project_myrmidonClient implements ClientModInitializer {
                 client.getNetworkHandler().sendChatMessage(content);
                 System.out.println("[Project Myrmidon] Sent chat: " + content);
             } else if ("command".equals(type)) {
-                String cmd = content.startsWith("/") ? content.substring(1) : content;
-                client.getNetworkHandler().sendChatCommand(cmd);
-                System.out.println("[Project Myrmidon] Ran command: " + content);
+                if (content.startsWith("#")) {
+                    String baritoneCmd = content.substring(1);
+                    if (executeBaritoneCommand(baritoneCmd)) {
+                        System.out.println("[Project Myrmidon] Baritone: " + content);
+                    } else {
+                        client.getNetworkHandler().sendChatMessage(content);
+                        System.out.println("[Project Myrmidon] Sent chat (Baritone unavailable): " + content);
+                    }
+                } else {
+                    String cmd = content.startsWith("/") ? content.substring(1) : content;
+                    client.getNetworkHandler().sendChatCommand(cmd);
+                    System.out.println("[Project Myrmidon] Ran command: " + content);
+                }
             }
 
             Files.delete(commandFile);
         } catch (Exception e) {
             System.err.println("[Project Myrmidon] Failed to execute command: " + e.getMessage());
             try { Files.deleteIfExists(commandFile); } catch (Exception ignored) {}
+        }
+    }
+
+    private static boolean executeBaritoneCommand(String command) {
+        try {
+            Object api = Class.forName("baritone.api.BaritoneAPI")
+                    .getMethod("getProvider").invoke(null);
+            Object baritone = api.getClass()
+                    .getMethod("getPrimaryBaritone").invoke(api);
+            Object cmdMgr = baritone.getClass()
+                    .getMethod("getCommandManager").invoke(baritone);
+            cmdMgr.getClass()
+                    .getMethod("execute", String.class).invoke(cmdMgr, command);
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 
