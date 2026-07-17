@@ -95,16 +95,26 @@ public class Project_myrmidonClient implements ClientModInitializer {
 
     private static boolean executeBaritoneCommand(String command) {
         try {
-            Object api = Class.forName("baritone.api.BaritoneAPI")
-                    .getMethod("getProvider").invoke(null);
-            Object baritone = api.getClass()
-                    .getMethod("getPrimaryBaritone").invoke(api);
+            System.out.println("[Project Myrmidon] Attempting Baritone command: " + command);
+            Class<?> apiClass = Class.forName("baritone.api.BaritoneAPI");
+            System.out.println("[Project Myrmidon] Found BaritoneAPI class");
+            Object provider = apiClass.getMethod("getProvider").invoke(null);
+            System.out.println("[Project Myrmidon] Got provider: " + provider.getClass().getName());
+            Object baritone = provider.getClass()
+                    .getMethod("getPrimaryBaritone").invoke(provider);
+            System.out.println("[Project Myrmidon] Got baritone: " + baritone.getClass().getName());
             Object cmdMgr = baritone.getClass()
                     .getMethod("getCommandManager").invoke(baritone);
-            cmdMgr.getClass()
+            System.out.println("[Project Myrmidon] Got commandManager: " + cmdMgr.getClass().getName());
+            Object result = cmdMgr.getClass()
                     .getMethod("execute", String.class).invoke(cmdMgr, command);
+            System.out.println("[Project Myrmidon] Baritone execute returned: " + result);
             return true;
         } catch (Exception e) {
+            System.err.println("[Project Myrmidon] Baritone command failed: " + e.getClass().getName() + ": " + e.getMessage());
+            if (e.getCause() != null) {
+                System.err.println("[Project Myrmidon] Caused by: " + e.getCause().getClass().getName() + ": " + e.getCause().getMessage());
+            }
             return false;
         }
     }
